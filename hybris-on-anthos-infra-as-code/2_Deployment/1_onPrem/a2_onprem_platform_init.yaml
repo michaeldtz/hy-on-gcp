@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hybris-admin-init
+  namespace: hybris
+  labels:
+    app: hybris-admin-init
+spec:
+    backoffLimit: 1
+
+    template:
+      metadata:
+        labels:
+          app: hybris-admin-init
+      spec:       
+        restartPolicy: Never   
+        serviceAccount: hybris-platform-service-account 
+        containers:
+
+# Hybris Platform container started with initialize
+        - name: hybris-admin-init
+          image: gcr.io/hybris-on-gcp/hybris_platform_b2c_acc
+          imagePullPolicy: Always
+            
+          command: ["/opt/startup/startup.sh"]
+          args: ["admin","initialize"]
+        
+          resources:  
+            limits:
+              memory: 4Gi
+              cpu: 2000m
+          
+
+          volumeMounts:
+          - mountPath: /etc/ssl/certs/hybris
+            name: ypai-ssl-vol
+          - mountPath: /opt/hybris/data/media
+            name: hybris-media-vol
+          - mountPath: /opt/aspects/admin/hybris/conf
+            name: hybris-config 
+   
+
+
+# Volumes
+        volumes:
+          - name: hybris-media-vol
+            nfs:
+              server: nfs-server-svc.hybris-gke.svc.cluster.local #Check the server name from onPrem
+              path: "/"
+              readOnly: false
+          - name: ypai-ssl-vol
+            secret:
+              secretName: hybris-ssl-certs
+          - name:  hybris-config
+            configMap:
+              name: hybris-config
+          - name: cloudsql-credentials
+            secret:
+              secretName: hybrisdb-sec

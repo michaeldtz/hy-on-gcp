@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hybrisdb-svc
+  namespace: hybris
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: hybrisdb
+  type: ClusterIP
+---
+apiVersion: apps/v1 
+kind: Deployment
+metadata:
+  name: hybrisdb
+  namespace: hybris
+spec:
+  selector:
+    matchLabels:
+      app: hybrisdb 
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: hybrisdb
+    spec:
+      containers:
+      - image: mysql:5.7.24
+        name: mysql
+        #args:
+        #- "/bin/sh"
+        #- "-c"
+        #- "sleep 3600"
+        env:
+          # Use secret in real usage
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hybrisdb-sec
+              key: db.password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: hybrisdb-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: hybrisdb-persistent-storage
+        persistentVolumeClaim:
+          claimName: hybrisdb-pv-claim

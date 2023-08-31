@@ -1,0 +1,82 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: hybris-storefront
+  namespace: hybris-gke
+  labels:
+    app: hybris-storefront
+    hybris-cluster: default
+spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: hybris-storefront
+          hybris-cluster: default
+      spec:    
+        serviceAccount: hybris-platform-service-account  
+        containers:
+        - name: hybris-storefront
+          image: gcr.io/hybris-on-gcp/hybris_platform_b2c_acc
+          imagePullPolicy: Always
+          tty: true
+          
+          command: ["/opt/startup/startup.sh"]
+          args: ["accstorefront"]
+        
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+            requests:
+              memory: 2Gi
+              cpu: 1000m
+
+          ports:
+            - name: https
+              containerPort: 8088
+              protocol: TCP
+
+          volumeMounts:
+          - mountPath: /etc/ssl/certs/hybris
+            name: ypai-ssl-vol
+          - mountPath: /opt/hybris/data/media
+            name: hybris-media-vol
+          - mountPath: /opt/aspects/accstorefront/hybris/conf
+            name: hybris-config
+
+        volumes:
+          - name: ypai-ssl-vol
+            secret:
+              secretName: hybris-ssl-certs
+          - name: hybris-media-vol
+            nfs:
+              server: nfs-server-gke-svc.hybris-gke.svc.cluster.local 
+              path: "/"
+              readOnly: false
+          
+          #- name: cloudsql-credentials
+          #  secret:
+          #    secretName: cloudsql-credentials
+
+          - name:  hybris-config
+            configMap:
+              name: hybris-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hybris-storefront-service
+  namespace: hybris-gke
+  labels:
+    app: hybris-storefront
+    hybris-cluster: default
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 443
+    targetPort: 8088
+    name: https
+    protocol: TCP
+  selector:
+    app: hybris-storefront

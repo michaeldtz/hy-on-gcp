@@ -1,0 +1,35 @@
+
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  labels:
+    app: nfs-test-client
+  name: nfs-test-client
+  namespace: hybris-gke
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nfs-test-client
+  template:
+    metadata:
+      labels:
+       app: nfs-test-client
+    spec:
+      restartPolicy: Always
+      volumes:
+        - name: nfs-volume
+          nfs:
+            server: nfs-server-svc.hybris-gke.svc.cluster.local
+            path: "/"
+            readOnly: false
+      containers:
+        - name: busybox
+          image: busybox
+          command:
+            - sleep
+            - "3600"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+          - mountPath: /mnt/nfs
+            name: nfs-volume

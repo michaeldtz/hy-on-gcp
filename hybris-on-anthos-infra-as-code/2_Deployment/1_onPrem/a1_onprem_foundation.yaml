@@ -1,0 +1,244 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  labels:
+    istio-injection: enabled
+  name: hybris
+  resourceVersion: "94605"
+  selfLink: /api/v1/namespaces/hybris
+  uid: ae51cf0b-5972-11ea-9c28-a673ea5a8a0f
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubeping-pod-reader
+  namespace: hybris-gke
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeping-k8s-api-access
+  namespace: hybris-gke
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeping-pod-reader
+subjects:
+- kind: ServiceAccount
+  name: hybris-platform-service-account
+  namespace: hy
+--- 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hybrisdb-pv-claim
+  namespace: hybris
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hybrisdb-svc
+  namespace: hybris
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: hybrisdb
+  type: ClusterIP
+---
+apiVersion: apps/v1 
+kind: Deployment
+metadata:
+  name: hybrisdb
+  namespace: hybris
+spec:
+  selector:
+    matchLabels:
+      app: hybrisdb 
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: hybrisdb
+    spec:
+      containers:
+      - image: mysql:5.7.24
+        name: mysql
+        #args:
+        #- "/bin/sh"
+        #- "-c"
+        #- "sleep 3600"
+        env:
+          # Use secret in real usage
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hybrisdb-sec
+              key: db.password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: hybrisdb-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: hybrisdb-persistent-storage
+        persistentVolumeClaim:
+          claimName: hybrisdb-pv-claim
+--- 
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: solr
+  namespace: hybris
+  labels:
+    app: solr
+spec:
+  serviceName: solr
+  selector:
+    matchLabels:
+      app: solr
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: solr
+    spec:
+      containers:
+      - name: solr
+        imagePullPolicy: Always
+        image: gcr.io/hybris-on-gcp/hybris_solr:stable
+        args: ["default"]
+        
+        ports:
+        - containerPort: 8983
+          name: solr-client
+          protocol: TCP
+
+        volumeMounts:
+        - mountPath: /opt/solr/server/solr/cores
+          name: solr-pvc
+        
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 2000m
+          limits:
+            memory: 2Gi
+            cpu: 2000m
+      restartPolicy: Always
+  volumeClaimTemplates:
+  - metadata:
+      name: solr-pvc
+      annotations:
+        pv.beta.kubernetes.io/gid: "8983"
+    spec:
+      accessModes:
+        - ReadWriteOnce 
+      resources:
+        requests:
+          storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solr
+  namespace: hybris
+  labels:
+    app: solr
+spec:
+  ports:
+  - port: 8983
+    name: solr
+    protocol: TCP
+  selector:
+    app: solr
+---
+apiVersion: apps/v1beta2
+kind: StatefulSet
+metadata:
+  labels:
+    app: nfs-server
+  name: nfs-server
+  namespace: hybris
+spec:
+  serviceName: nfs-server-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+       app: nfs-server
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine
+          ports:
+          - name: nfs
+            containerPort: 2049
+            protocol: TCP
+          - name: rpcbind
+            containerPort: 111              
+            protocol: UDP
+          - name: mountd
+            containerPort: 20048
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+          env:
+            - name: SHARED_DIRECTORY
+              value: /mnt/nfs
+          volumeMounts:
+          - mountPath: /mnt/nfs
+            name: nfs-server-vol
+  volumeClaimTemplates:
+  - metadata:
+      name: nfs-server-vol
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nfs-server
+  name: nfs-server-svc
+  namespace: hybris
+spec:
+  ports:
+    - name: mountd
+      port: 20048
+      protocol: TCP
+    - name: nfs
+      port: 2049
+      protocol: TCP
+    - name: rpcbind
+      port: 111
+      protocol: UDP
+  selector:
+    app: nfs-server

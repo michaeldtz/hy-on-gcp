@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: hac-bo-ingress
+  namespace: hybris
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        backend:
+          serviceName: hybris-hac
+          servicePort: 443
+      - path: /backoffice
+        backend:
+          serviceName: hybris-backoffice
+          servicePort: 443

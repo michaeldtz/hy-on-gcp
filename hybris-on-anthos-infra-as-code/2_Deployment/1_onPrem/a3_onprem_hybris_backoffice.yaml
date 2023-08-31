@@ -1,0 +1,82 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: hybris-backoffice
+  namespace: hybris
+  labels:
+    app: hybris-backoffice
+    hybris-cluster: default
+spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: hybris-backoffice
+          hybris-cluster: default
+      spec:           
+        serviceAccount: hybris-platform-service-account
+        containers:
+        - name: hybris-backoffice
+          image: gcr.io/hybris-on-gcp/hybris_platform_b2c_acc
+          imagePullPolicy: Always
+          tty: true
+          
+          command: ["/opt/startup/startup.sh"]
+          args: ["backoffice"]
+        
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+            requests:
+              memory: 2Gi
+              cpu: 1000m
+
+          ports:
+            - name: https
+              containerPort: 8088
+              protocol: TCP
+
+          volumeMounts:
+          - mountPath: /etc/ssl/certs/hybris
+            name: ypai-ssl-vol
+          - mountPath: /opt/hybris/data/media
+            name: hybris-media-vol
+          - mountPath: /opt/aspects/backoffice/hybris/conf
+            name: hybris-config
+
+  
+        volumes:
+
+          - name: ypai-ssl-vol
+            secret:
+              secretName: hybris-ssl-certs
+          - name: hybris-media-vol
+            nfs:
+              server: nfs-server-svc.hybris-gke.svc.cluster.local 
+              path: "/"
+              readOnly: false
+          #- name: cloudsql-credentials
+              #secret:
+              #secretName: cloudsql-credentials
+          - name:  hybris-config
+            configMap:
+              name: hybris-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hybris-backoffice-service
+  namespace: hybris
+  labels:
+    app: hybris-backoffice
+    hybris-cluster: default
+spec:
+  type: NodePort
+  ports:
+  - port: 443
+    targetPort: 8088
+    name: https
+    protocol: TCP
+  selector:
+    app: hybris-backoffice
