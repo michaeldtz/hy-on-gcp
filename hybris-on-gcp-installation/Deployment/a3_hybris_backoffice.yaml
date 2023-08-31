@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hybris-backoffice
+  labels:
+    app: hybris-backoffice
+    hybris-cluster: default
+spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: hybris-backoffice 
+    template:
+      metadata:
+        labels:
+          app: hybris-backoffice
+          hybris-cluster: default
+      spec:           
+        serviceAccount: hybris-platform-service-account
+        containers:
+        - name: hybris-backoffice
+          image: gcr.io/hybris-on-gcp/hybris_platform_b2c_acc
+          imagePullPolicy: Always
+          tty: true
+          
+          command: ["/opt/startup/startup.sh"]
+          args: ["backoffice"]
+        
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: 1
+            requests:
+              memory: 2Gi
+              cpu: 1
+
+          ports:
+            - name: https
+              containerPort: 8088
+              protocol: TCP
+
+          volumeMounts:
+          - mountPath: /etc/ssl/certs/hybris
+            name: ypai-ssl-vol
+          - mountPath: /opt/hybris/data/media
+            name: ypai-media-vol
+          - mountPath: /opt/aspects/backoffice/hybris/conf
+            name: hybris-config
+
+    # [SQL proxy_container]
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          command: ["/cloud_sql_proxy",
+                    "-instances=hybris-on-gcp:europe-west3:hybris-db-mysql-master=tcp:3306",
+                    "-credential_file=/secrets/cloudsql/credentials.json"]
+          securityContext:
+            runAsUser: 2  # non-root user
+            allowPrivilegeEscalation: false
+
+          resources:  
+            limits:
+              memory: 2Gi
+              cpu: 1
+
+          volumeMounts:
+            - name: cloudsql-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+
+      # [END SQL proxy_container]
+
+        volumes:
+          - name: ypai-ssl-vol
+            secret:
+              secretName: hybris-ssl-certs
+          - name: ypai-media-vol
+            persistentVolumeClaim:
+              claimName: ypai-media-pvc
+              readOnly: false
+          - name: cloudsql-credentials
+            secret:
+              secretName: cloudsql-credentials
+          - name:  hybris-config
+            configMap:
+              name: hybris-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hybris-backoffice-service
+  labels:
+    app: hybris-backoffice
+    hybris-cluster: default
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 443
+    targetPort: 8088
+    name: https
+    protocol: TCP
+  selector:
+    app: hybris-backoffice

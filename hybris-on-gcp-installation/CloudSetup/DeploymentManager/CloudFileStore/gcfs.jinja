@@ -1,0 +1,17 @@
+
+{% set ID = env['name'] %}
+
+resources:
+- name: filestore
+  type: gcp-types/file-v1beta1:projects.locations.instances
+  properties:
+    parent: projects/{{ env['project'] }}/locations/{{ properties['zone'] }}
+    # Any name of the instance would do
+    instanceId: {{ ID }}
+    tier: STANDARD
+    description: fileshare
+    networks:
+    - network: default
+    fileShares:
+    - name: {{ properties['fileShareName'] }}
+      capacityGb: {{ properties['capacityGb'] }}

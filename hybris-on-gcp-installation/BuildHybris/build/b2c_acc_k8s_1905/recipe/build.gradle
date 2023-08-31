@@ -1,0 +1,192 @@
+apply plugin: 'installer-platform-plugin'
+apply plugin: 'installer-platform-containerization-plugin'
+apply plugin: 'installer-addon2-plugin'
+apply plugin: 'java'
+
+def pl = platform {
+
+    localProperties {
+        property 'persistence.legacy.mode', 'false'
+        property 'apiregistryservices.events.exporting', 'false'
+    } 
+
+    extensions {
+        extName 'adaptivesearchsolr'
+        extName 'adaptivesearchbackoffice'
+        extName 'adaptivesearchsamplesaddon'
+        extName 'adaptivesearchwebservices'
+        extName 'commerceservicesbackoffice'
+        extName 'solrfacetsearchbackoffice'
+        extName 'solrserver'
+        extName 'yacceleratorbackoffice'
+        extName 'yacceleratorinitialdata'
+        extName 'yacceleratorfulfilmentprocess'
+        extName 'yacceleratorstorefront'
+        extName 'ycommercewebservices'
+        extName 'ycommercewebservicestest'
+
+        extName 'apparelstore'
+
+        extName 'acceleratorwebservicesaddon'
+        extName 'orderselfserviceaddon'
+
+        extName 'customersupportbackoffice'
+        extName 'customerticketingaddon'
+        extName 'commerceorgsamplesaddon'
+
+        extName 'rulebuilderbackoffice'
+        extName 'couponbackoffice'
+        extName 'droolsruleengineservices'
+        extName 'couponfacades'
+        extName 'promotionenginesamplesaddon'
+
+        extName 'cmswebservices'
+        extName 'smarteditwebservices'
+        extName 'cmssmarteditwebservices'
+        extName 'permissionswebservices'
+        extName 'smarteditaddon'
+        extName 'cmssmartedit'
+        extName 'cmsoccaddon'
+
+        
+        extName 'previewpersonalizationweb'
+        extName 'personalizationcmsweb'
+        extName 'personalizationsmartedit'
+        extName 'personalizationpromotionssmartedit'
+        extName 'personalizationsampledataaddon'
+        extName 'personalizationpromotionssampledataaddon'
+        extName 'personalizationpromotions'
+        extName 'personalizationpromotionsweb'
+        extName 'personalizationservicesbackoffice'
+        extName 'personalizationpromotionsbackoffice'
+        extName 'personalizationcmsbackoffice'
+        extName 'personalizationsearchbackoffice'
+        extName 'personalizationsearchsmartedit'
+        extName 'personalizationsearchweb'
+        extName 'personalizationsearchsamplesaddon'
+
+        extName 'textfieldconfiguratortemplatebackoffice'
+        extName 'textfieldconfiguratortemplateaddon'
+        extName 'assistedservicestorefront'
+        extName 'assistedservicepromotionaddon'
+
+        extName 'pcmbackofficesamplesaddon'
+
+        extName 'kymaintegrationbackoffice'
+
+        /* integration-apis */
+        extName 'outboundservices'
+        extName 'outboundsync'
+        extName 'odata2webservices'
+        extName 'odata2webservicesfeaturetests'
+        extName 'integrationbackoffice'
+        extName 'integrationmonitoringbackoffice'
+        extName 'outboundsyncbackoffice'
+
+    } 
+    
+    addons {
+        forStoreFronts('yacceleratorstorefront') {
+            names 'commerceorgsamplesaddon', 'promotionenginesamplesaddon', 'smarteditaddon', 'textfieldconfiguratortemplateaddon', 'assistedservicestorefront', 'assistedservicepromotionaddon', 'customerticketingaddon', 'orderselfserviceaddon', 'adaptivesearchsamplesaddon', 'pcmbackofficesamplesaddon', 'personalizationsearchsamplesaddon'
+            template 'yacceleratorstorefront'
+        }
+    }
+}
+
+def dpl = deployment('b2c_acc_k8s') {
+
+    
+    /* Creates the image for the HSQL DB */
+    hsqlImage('hsql') {
+        properties {
+            property 'port', '9090'
+        }
+    }
+
+    /* Solr Image  */
+    solrImage('solr'){
+        templateDir      "/gcphybris/resources/solr/resources/"
+        solrDistribution "/gcphybris/resources/solr/server/"
+    } 
+    
+    platformImage('platform') {
+        basedOn pl
+
+        aspect('hac') {
+            enabledWebApps 'hac', 'mediaweb', 'odata2webservices' 
+
+            localProperties {
+                property 'spring.session.enabled', 'true'
+                property 'spring.session.hac.save', 'async'
+                property 'spring.session.hac.cookie.name', 'JSESSIONID'
+                property 'spring.session.hac.cookie.path', '/'
+                property 'backofficesearch.cronjob.nodegroup', 'backoffice'
+            }
+
+            templatesProperties {
+              property 'httpsConnectorEnabled', 'true'
+              property 'httpConnectorEnabled', 'true'              
+            }
+        } 
+  
+        aspect('accstorefront') {
+            enabledWebApps 'yacceleratorstorefront', 'mediaweb'
+
+            localProperties {
+                property 'spring.session.enabled', 'true'
+                property 'spring.session.yacceleratorstorefront.save', 'async'
+                property 'spring.session.yacceleratorstorefront.cookie.name', 'JSESSIONID'
+                property 'spring.session.yacceleratorstorefront.cookie.path', '/yacceleratorstorefront'
+                property 'addonfilter.active', 'false'
+            }
+
+            templatesProperties {
+              property 'httpsConnectorEnabled', 'true'
+              property 'httpConnectorEnabled', 'true'              
+            }
+        }
+        
+        aspect('backoffice') {
+            enabledWebApps 'backoffice', 'mediaweb'
+
+            localProperties {
+                property 'backoffice.webroot', '/backoffice'
+                property 'spring.session.enabled', 'true'
+                property 'spring.session.hac.save', 'async'
+                property 'spring.session.hac.cookie.name', 'JSESSIONID'
+                property 'spring.session.hac.cookie.path', '/backoffice'
+                property 'task.engine.exclusive.mode', 'true'
+                property 'cluster.node.groups', 'backoffice'
+                property 'backofficesearch.cronjob.nodegroup', 'backoffice'
+            }
+
+            templatesProperties {
+              property 'httpsConnectorEnabled', 'true'
+              property 'httpConnectorEnabled', 'true'   
+            }
+        }
+
+        /* Without webapps, just for running bg processes */
+        aspect('bgprocessing')
+
+        /* Used for running admin init without tomcat */ 
+        adminAspect({
+            property 'backofficesearch.cronjob.nodegroup', 'backoffice'
+        })
+
+
+    }
+
+}
+
+task createImagesStructure {
+    doLast {        
+        dpl.createImagesStructure()
+    }
+}
+
+task buildImages(dependsOn: createImagesStructure) {
+    doLast {
+        dpl.buildImages()
+    }
+}

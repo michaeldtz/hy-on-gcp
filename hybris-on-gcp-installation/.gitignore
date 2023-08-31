@@ -1,0 +1,5 @@
+**/.DS_Store
+.secrets/
+BuildBuilder/inst-files/*
+!BuildBuilder/inst-files/README.md
+!BuildBuilder/inst-files/CONFIG.ZIP

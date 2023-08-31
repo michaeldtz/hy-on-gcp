@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hybris-admin-init
+  labels:
+    app: hybris-admin-init
+spec:
+    backoffLimit: 1
+    template:
+      metadata:
+        labels:
+          app: hybris-admin-init
+      spec:       
+        restartPolicy: Never   
+        serviceAccount: hybris-platform-service-account 
+        containers:
+
+# Hybris Platform container started with initialize
+        - name: hybris-admin-init
+          image: gcr.io/hybris-on-gcp/hybris_platform_b2c_acc
+          imagePullPolicy: Always
+            
+          command: ["/opt/startup/startup.sh"]
+          args: ["admin","initialize"]
+        
+          resources:  
+            limits:
+              memory: 8Gi
+              cpu: 2
+            requests:
+              memory: 8Gi
+              cpu: 2
+          
+          # Used for the JGroups Configuration with KubePing
+          #env:
+          #- name: MOD_CLUSTER_ADDRESS_GROUP
+          #  value: 224.0.1.105
+          #- name: MOD_CLUSTER_ADDRESS_PORT
+          #  value: "23365"
+
+          volumeMounts:
+          - mountPath: /etc/ssl/certs/hybris
+            name: ypai-ssl-vol
+          - mountPath: /opt/hybris/data/media
+            name: ypai-media-vol
+          - mountPath: /opt/aspects/admin/hybris/conf
+            name: hybris-config 
+   
+
+# CloudSQL Proxy
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          command: ["/cloud_sql_proxy",
+                    "-instances=hybris-on-gcp:europe-west3:hybris-db-mysql-master=tcp:3306",
+                    "-credential_file=/secrets/cloudsql/credentials.json"]
+          securityContext:
+            runAsUser: 2  # non-root user
+            allowPrivilegeEscalation: false
+
+          resources:  
+            limits:
+              memory: 2Gi
+              cpu: 1
+
+          volumeMounts:
+            - name: cloudsql-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+
+# Volumes
+        volumes:
+          - name: ypai-ssl-vol
+            secret:
+              secretName: hybris-ssl-certs
+          - name: ypai-media-vol
+            persistentVolumeClaim:
+              claimName: ypai-media-pvc
+          - name:  hybris-config
+            configMap:
+              name: hybris-config
+          - name: cloudsql-credentials
+            secret:
+              secretName: cloudsql-credentials

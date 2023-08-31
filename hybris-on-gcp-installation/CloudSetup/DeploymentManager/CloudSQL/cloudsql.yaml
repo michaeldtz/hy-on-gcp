@@ -1,0 +1,40 @@
+imports:
+  - path: cloudsql.jinja
+  - path: password.py
+
+resources:
+  - name: gen-password-root
+    type: password.py
+    properties:
+      length: 8
+      includeSymbols: true
+
+  - name: gen-password-hybrisdb
+    type: password.py
+    properties:
+      length: 8
+      includeSymbols: true
+
+  - name: hybris-db-mysql
+    type: cloudsql.jinja
+    properties:
+      database:
+        name: hybris
+      rootUser:
+        password: $(ref.gen-password-root.password)
+      dbUser:
+        name: hybrisdb
+        password: $(ref.gen-password-hybrisdb.password)
+      failover: false
+      readReplicas: 0
+      cloudsql:
+        databaseVersion: MYSQL_5_7
+        region: europe-west3
+        zone: europe-west3-c
+  
+outputs:
+  - name: root-password
+    value: $(ref.gen-password-root.password)
+  - name: hybrisdb-password
+    value: $(ref.gen-password-hybrisdb.password)
+

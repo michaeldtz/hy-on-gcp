@@ -1,0 +1,74 @@
+substitutions:
+    _VERSION: "1905"
+    _BUILDER_TAG: ":1905"
+    _RECIPE: "b2c_acc_k8s_1905"
+
+
+steps: 
+ 
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'BuildHybris'
+    args: ['pull','gcr.io/hybris-on-gcp/hybris-builder${_BUILDER_TAG}']
+    timeout: 600s
+
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'BuildHybris'
+    args: ['run','-t','-d','--name', 'hybris_builder_container',
+    '-v','/var/run/docker.sock:/var/run/docker.sock',
+    '-v','/workspace/BuildHybris/config/:/gcphybris/conf/',
+    '-v','/workspace/BuildHybris/build/:/gcphybris/build/',
+    '-v','/workspace/BuildHybris/supp-files/:/gcphybris/supp/',
+    'gcr.io/hybris-on-gcp/hybris-builder${_BUILDER_TAG}']
+  
+  - name: 'gcr.io/cloud-builders/docker'  
+    dir: 'BuildHybris'
+    args: ['exec','hybris_builder_container','bash','/gcphybris/build/${_RECIPE}/build.sh']
+    timeout: 1200s
+ 
+
+        
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'BuildHybris'
+    args: ['tag', 'b2c_acc_k8s_platform','gcr.io/hybris-on-gcp/hybris_platform_b2c_acc']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'BuildHybris'
+    args: ['tag', 'b2c_acc_k8s_platform','gcr.io/hybris-on-gcp/hybris_platform_b2c_acc:${_VERSION}']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'BuildHybris'
+    args: ['tag', 'b2c_acc_k8s_hsql','gcr.io/hybris-on-gcp/hybris_hsql']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'BuildHybris'
+    args: ['tag', 'b2c_acc_k8s_solr','gcr.io/hybris-on-gcp/hybris_solr']
+
+
+
+  - name: 'gcr.io/cloud-builders/docker'  
+    dir: 'BuildHybris'
+    args: ['push','gcr.io/hybris-on-gcp/hybris_platform_b2c_acc']
+    timeout: 1200s
+
+  - name: 'gcr.io/cloud-builders/docker'  
+    dir: 'BuildHybris'
+    args: ['push','gcr.io/hybris-on-gcp/hybris_platform_b2c_acc:${_VERSION}']
+    timeout: 1200s
+     
+  - name: 'gcr.io/cloud-builders/docker'  
+    dir: 'BuildHybris'
+    args: ['push','gcr.io/hybris-on-gcp/hybris_hsql'] 
+    timeout: 1200s 
+
+  - name: 'gcr.io/cloud-builders/docker'  
+    dir: 'BuildHybris'
+    args: ['push','gcr.io/hybris-on-gcp/hybris_solr'] 
+    timeout: 1200s
+ 
+
+
+options:
+    machineType: 'N1_HIGHCPU_32' 
+
+timeout: 6000s
+  

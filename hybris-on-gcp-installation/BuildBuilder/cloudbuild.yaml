@@ -1,0 +1,50 @@
+substitutions:
+    _VERSION: "1905"
+    _GCS_HYBRIS_INSTALLATION_FILES_BUCKET: "gs://hybris-installation-files/hybris-commerce-1905"
+
+steps:
+
+- name: 'gcr.io/cloud-builders/gsutil'
+  dir: 'BuildBuilder'
+  args: [ '-m', 'cp', '-r', '${_GCS_HYBRIS_INSTALLATION_FILES_BUCKET}/CXCMR.ZIP', './inst-files/CXCMR.ZIP']
+  timeout: 200s
+
+- name: 'gcr.io/cloud-builders/gsutil'
+  dir: 'BuildBuilder'
+  args: [ '-m', 'cp', '-r', '${_GCS_HYBRIS_INSTALLATION_FILES_BUCKET}/CXCOMM.ZIP', './inst-files/CXCOMM.ZIP']
+  timeout: 200s
+
+- name: 'gcr.io/cloud-builders/gsutil'
+  dir: 'BuildBuilder'
+  args: [ '-m', 'cp', '-r', '${_GCS_HYBRIS_INSTALLATION_FILES_BUCKET}/CXDATAHUB.ZIP', './inst-files/CXDATAHUB.ZIP']
+  timeout: 200s
+
+- name: 'gcr.io/cloud-builders/gsutil'
+  dir: 'BuildBuilder'
+  args: [ '-m', 'cp', '-r', '${_GCS_HYBRIS_INSTALLATION_FILES_BUCKET}/CONFIG.ZIP', './inst-files/CONFIG.ZIP']
+  timeout: 200s
+
+- name: 'gcr.io/cloud-builders/docker'
+  dir: 'BuildBuilder'
+  args: ['build', '-t', 'gcr.io/hybris-on-gcp/hybris-builder:latest', '.']
+  timeout: 800s
+
+- name: 'gcr.io/cloud-builders/docker'
+  dir: 'BuildBuilder'
+  args: ['tag', 'gcr.io/hybris-on-gcp/hybris-builder:latest', 'gcr.io/hybris-on-gcp/hybris-builder:${_VERSION}']
+  timeout: 200s
+
+- name: 'gcr.io/cloud-builders/docker'
+  dir: 'BuildBuilder'
+  args: ['push', 'gcr.io/hybris-on-gcp/hybris-builder:latest']
+  timeout: 200s
+
+- name: 'gcr.io/cloud-builders/docker'
+  dir: 'BuildBuilder'
+  args: ['push', 'gcr.io/hybris-on-gcp/hybris-builder:${_VERSION}']
+  timeout: 200s
+
+options:
+    machineType: 'N1_HIGHCPU_32'
+
+timeout: 2000s

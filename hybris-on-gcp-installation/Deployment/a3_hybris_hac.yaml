@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hybris-hac
+  labels:
+    app: hybris-hac
+    hybris-cluster: default
+spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: hybris-hac 
+    template:
+      metadata:
+        labels:
+          app: hybris-hac
+          hybris-cluster: default
+      spec:      
+        serviceAccount: hybris-platform-service-account
+        containers:
+        - name: hybris-hac
+          image: gcr.io/hybris-on-gcp/hybris_platform_b2c_acc
+          imagePullPolicy: Always
+          
+          command: ["/opt/startup/startup.sh"]
+          args: ["hac"]
+        
+          resources:
+            limits:
+              memory: 8Gi
+              cpu: 2
+            requests:
+              memory: 8Gi
+              cpu: 2
+
+
+          ports:
+            - name: https
+              containerPort: 8088
+              protocol: TCP
+
+          #env:
+          #- name: MOD_CLUSTER_ADDRESS_GROUP
+          #  value: 224.0.1.105
+          #- name: MOD_CLUSTER_ADDRESS_PORT
+          #  value: "23365"
+
+          volumeMounts:
+          - mountPath: /etc/ssl/certs/hybris
+            name: ypai-ssl-vol
+          - mountPath: /opt/hybris/data/media
+            name: ypai-media-vol
+          - mountPath: /opt/aspects/hac/hybris/conf
+            name: hybris-config
+
+    # [SQL proxy_container]
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          command: ["/cloud_sql_proxy",
+                    "-instances=hybris-on-gcp:europe-west3:hybris-db-mysql-master=tcp:3306",
+                    "-credential_file=/secrets/cloudsql/credentials.json"]
+          securityContext:
+            runAsUser: 2  # non-root user
+            allowPrivilegeEscalation: false
+
+          resources:  
+            limits:
+              memory: 2Gi
+              cpu: 1
+
+          volumeMounts:
+            - name: cloudsql-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+
+      # [END SQL proxy_container]
+
+        volumes:
+          - name: ypai-ssl-vol
+            secret:
+              secretName: hybris-ssl-certs
+          - name: ypai-media-vol
+            persistentVolumeClaim:
+              claimName: ypai-media-pvc
+              readOnly: false
+          - name:  hybris-config
+            configMap:
+              name: hybris-config
+          - name: cloudsql-credentials
+            secret:
+              secretName: cloudsql-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hybris-hac-service
+  labels:
+    app: hybris-hac
+    hybris-cluster: default
+spec:
+  type: LoadBalancer
+  sessionAffinity: ClientIP
+  ports:
+  - port: 443
+    targetPort: 8088
+    name: https
+    protocol: TCP
+  selector:
+    app: hybris-hac

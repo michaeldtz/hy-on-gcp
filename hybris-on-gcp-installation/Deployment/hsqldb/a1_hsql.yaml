@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hsql
+  labels:
+    app: hsql
+spec:
+  serviceName: "hsql"
+  selector:
+    matchLabels:
+      app: hsql
+  template:
+    metadata:
+      labels:
+        app: hsql
+    spec:
+      containers:
+        - name: hsql
+          image: gcr.io/hybris-on-gcp/hybris_hsql
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: 12Gi
+              cpu: 3
+          ports:
+            - containerPort: 9090
+              name: hsql
+          volumeMounts:
+          - mountPath: /opt/hsqldb/data
+            name: hsql-data-vol
+      volumes:
+      - name: hsql-data-vol
+        persistentVolumeClaim:
+          claimName: hsql-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hsql-data-pvc
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hsql
+  labels:
+    app: hsql
+spec:
+  ports:
+  - port: 9090
+    name: hsql
+    protocol: TCP
+  selector:
+    app: hsql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: solr
+  labels:
+    app: solr
+spec:
+  serviceName: "solr"
+  selector:
+    matchLabels:
+      app: solr
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: solr
+    spec:
+      containers:
+      - name: solr
+        image: gcr.io/hybris-on-gcp/ybase_solr
+        args:
+        - default
+        imagePullPolicy: Always
+        resources:
+            requests:
+              memory: 16Gi
+              cpu: 3
+        ports:
+            - containerPort: 8983
+              name: solr-pvc
+        volumeMounts:
+        - mountPath: /opt/solr/server/solr/cores
+          name: solr-vol
+      restartPolicy: Always
+      volumes:
+      - name: solr-vol
+        persistentVolumeClaim:
+          claimName: solr-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solr
+  labels:
+    app: solr
+spec:
+  ports:
+  - port: 8983
+    name: solr
+    protocol: TCP
+  selector:
+    app: solr
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: solr-pvc
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
